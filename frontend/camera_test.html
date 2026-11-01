@@ -1,0 +1,39 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RepsCV — Camera Test</title>
+</head>
+<body>
+    <h1>RepsCV Camera Test</h1>
+
+    <video id="camera" autoplay playsinline muted
+           style="width: 100%; max-width: 640px;"></video>
+
+    <p id="status">Camera not started</p>
+
+    <button id="start">Start Camera</button>
+
+    <script>
+        const video = document.getElementById("camera");
+        const status = document.getElementById("status");
+        const button = document.getElementById("start");
+
+        button.addEventListener("click", async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false
+                });
+
+                video.srcObject = stream;
+                status.textContent = "Camera running!";
+            } catch (error) {
+                status.textContent = "Camera error: " + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
