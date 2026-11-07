@@ -12,6 +12,8 @@ export default function PoseDetector() {
     const trackingRef = useRef(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [status, setStatus] = useState("Camera is off");
+    const [reps, setReps] = useState(0);
+    const socketRef = useRef<WebSocket | null>(null);
 
     async function startCamera() {
         try {
@@ -143,6 +145,16 @@ export default function PoseDetector() {
 
                     const angle = calculateAngle(shoulder, elbow, wrist);
 
+                    const socket = socketRef.current;
+
+                    if (
+                        socket?.readyState === WebSocket.OPEN &&
+                        Number.isFinite(angle) &&
+                        socket.bufferedAmount === 0
+                    ) {
+                        socket.send(JSON.stringify({ angle }));
+                    }
+
                     setStatus(`Left elbow angle: ${angle.toFixed(1)}°`);
                 } else {
                     setStatus("Looking for a person...");
@@ -153,6 +165,44 @@ export default function PoseDetector() {
         }
 
         requestAnimationFrame(trackFrame);
+    }
+
+    function connectToBackend() {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            return;
+        }
+
+        const socket = new WebSocket("ws://localhost:8000/ws");
+
+        socketRef.current = socket;
+
+        socket.onopen = () => {
+            console.log("Connected to Python backend!");
+            setStatus("Connected to Python!");
+        };
+
+        socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+            if (typeof data.reps === "number") {
+                setReps(data.reps);
+            }
+
+            if (data.error) {
+                console.warn("Python:", data.error);
+            }
+        };
+
+        socket.onerror = (error) => {
+            console.error("WebSocket error:", error);
+            setStatus("Backend connection error");
+        };
+
+        socket.onclose = () => {
+            console.log("Disconnected from Python");
+            if (socketRef.current === socket) {
+                socketRef.current = null;
+            }
+        };
     }
 
 
@@ -170,6 +220,7 @@ export default function PoseDetector() {
                     maxWidth: "640px",
                 }}
             >
+                <h1>Push-ups: {reps}</h1>
                 <video
                     ref={videoRef}
                     autoPlay
@@ -195,6 +246,8 @@ export default function PoseDetector() {
             <button onClick={loadPoseModel}>Load AI Model</button>
             <button onClick={detectPose}>Detect Pose</button>
             <button onClick={startTracking}>Start Tracking</button>
+            <button onClick={connectToBackend}>Connect to Python</button>
+
         </div>
     );
 }
