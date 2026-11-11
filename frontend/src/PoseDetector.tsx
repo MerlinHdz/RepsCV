@@ -145,17 +145,27 @@ export default function PoseDetector() {
 
                     const angle = calculateAngle(shoulder, elbow, wrist);
 
+                    const hip = landmarks[23];
+                    const ankle = landmarks[27];
+                    const bodyAngle = calculateAngle(shoulder, hip, ankle)
+
                     const socket = socketRef.current;
 
                     if (
                         socket?.readyState === WebSocket.OPEN &&
                         Number.isFinite(angle) &&
+                        Number.isFinite(bodyAngle) &&
                         socket.bufferedAmount === 0
                     ) {
-                        socket.send(JSON.stringify({ angle }));
+                        socket.send(JSON.stringify({
+                            angle,
+                            body_angle: bodyAngle
+                        }));
                     }
 
-                    setStatus(`Left elbow angle: ${angle.toFixed(1)}°`);
+                    setStatus(
+                        `Elbow: ${angle.toFixed(1)}° | Body: ${bodyAngle.toFixed(1)}°`
+                    );
                 } else {
                     setStatus("Looking for a person...");
                 }

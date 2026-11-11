@@ -30,6 +30,7 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_json()
 
             angle = data.get("angle")
+            body_angle = data.get("body_angle")
 
             if (
                 type(angle) not in (int, float)
@@ -41,12 +42,23 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
                 continue
 
-            reps = counter.update(angle)
+            if (
+                type(body_angle) not in (int, float)
+                or not math.isfinite(body_angle)
+                or not 0 <= body_angle <= 180
+            ):
+                await websocket.send_json({
+                    "error": "Invalid body angle"
+                })
+                continue
+
+            reps = counter.update(angle, body_angle)
 
             await websocket.send_json({
                 "reps": reps,
                 "state": counter.state,
-                "angle": angle
+                "angle": angle,
+                "body_angle": body_angle
             })
 
     except WebSocketDisconnect:
