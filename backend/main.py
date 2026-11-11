@@ -1,9 +1,12 @@
 
-from fastapi import FastAPI
-from fastapi import WebSocket
-from backend.rep_counter import RepCounter
+"""HTTP health check and per-connection push-up tracking WebSocket."""
+
+import json
 import math
-from fastapi import WebSocketDisconnect
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+from backend.rep_counter import RepCounter
 
 app = FastAPI()
 
@@ -18,48 +21,30 @@ def health():
     return {"status": "ok", "app": "RepsCV"}
 
 
+def valid_frame(data):
+    if not isinstance(data, dict):
+        return False
+    aspect = data.get("aspect_ratio")
+    if type(aspect) not in (int, float) or not math.isfinite(aspect) or not 0.3 <= aspect <= 4:
+        return False
+    landmarks = data.get("landmarks")
+    return landmarks is None or (isinstance(landmarks, dict) and len(landmarks) <= 33)
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-
-    # Each connection gets its own counter.
     counter = RepCounter()
-
     try:
         while True:
-            data = await websocket.receive_json()
-
-            angle = data.get("angle")
-            body_angle = data.get("body_angle")
-
-            if (
-                type(angle) not in (int, float)
-                or not math.isfinite(angle)
-                or not 0 <= angle <= 180
-            ):
-                await websocket.send_json({
-                    "error": "Invalid elbow angle"
-                })
+            raw = await websocket.receive_text()
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                data = None
+            if not valid_frame(data):
+                await websocket.send_json(counter.error_response("Invalid pose frame."))
                 continue
-
-            if (
-                type(body_angle) not in (int, float)
-                or not math.isfinite(body_angle)
-                or not 0 <= body_angle <= 180
-            ):
-                await websocket.send_json({
-                    "error": "Invalid body angle"
-                })
-                continue
-
-            reps = counter.update(angle, body_angle)
-
-            await websocket.send_json({
-                "reps": reps,
-                "state": counter.state,
-                "angle": angle,
-                "body_angle": body_angle
-            })
-
+            await websocket.send_json(counter.update(data))
     except WebSocketDisconnect:
-        print("Client disconnected")
+        pass
