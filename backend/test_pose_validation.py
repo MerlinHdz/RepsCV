@@ -2,9 +2,9 @@
 
 import unittest
 
-from backend.main import valid_frame
+from backend.workouts import validate_pose_message
 from backend.rep_counter import RepCounter, Thresholds, assess_pose
-from backend.test_rep_counter import frame, hold
+from backend.test_rep_counter import frame, hold, wire
 
 
 class PoseValidationTests(unittest.TestCase):
@@ -67,9 +67,9 @@ class PoseValidationTests(unittest.TestCase):
     def test_invalid_aspect_and_payload_shapes_are_rejected(self):
         for aspect in (0, -1, 5, "1", True, float("inf")):
             with self.subTest(aspect=aspect):
-                self.assertFalse(valid_frame({"aspect_ratio": aspect, "landmarks": None}))
-        self.assertFalse(valid_frame([frame()]))
-        self.assertFalse(valid_frame({"aspect_ratio": 1, "landmarks": [1, 2]}))
+                self.assertFalse(validate_pose_message(wire({"aspect_ratio": aspect, "landmarks": None})))
+        self.assertFalse(validate_pose_message([frame()]))
+        self.assertFalse(validate_pose_message(wire({"aspect_ratio": 1, "landmarks": [1, 2]})))
 
 
 if __name__ == "__main__":

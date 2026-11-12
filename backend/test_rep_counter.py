@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from backend.main import valid_frame
+from backend.workouts import validate_pose_message
 from backend.rep_counter import RepCounter
 
 
@@ -25,6 +25,11 @@ def frame(elbow_angle=170, *, hip_y=0.5, standing=False, left=True, right=True,
                                 (shoulder, elbow, wrist, hip, ankle)):
             points[f"{side}_{part}"] = {"x": x, "y": y, "visibility": confidence, "presence": confidence}
     return {"aspect_ratio": 1, "landmarks": points}
+
+
+def wire(pose, sequence=0):
+    return {"type": "landmarks", "sequence": sequence, "timestamp_ms": sequence * 50,
+            "aspect_ratio": pose["aspect_ratio"], "points": pose["landmarks"]}
 
 
 def hold(counter, angle, start, **kwargs):
@@ -125,9 +130,9 @@ class RepCounterTests(unittest.TestCase):
         self.assertEqual(hold(counter, 170, 1.15)["reps"], 1)
 
     def test_invalid_protocol_frame(self):
-        self.assertFalse(valid_frame({"aspect_ratio": float("nan"), "landmarks": None}))
-        self.assertFalse(valid_frame({"aspect_ratio": 1, "landmarks": []}))
-        self.assertTrue(valid_frame(frame()))
+        self.assertFalse(validate_pose_message(wire({"aspect_ratio": float("nan"), "landmarks": None})))
+        self.assertFalse(validate_pose_message(wire({"aspect_ratio": 1, "landmarks": []})))
+        self.assertTrue(validate_pose_message(wire(frame())))
 
 
 if __name__ == "__main__":

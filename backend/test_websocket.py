@@ -1,72 +1,70 @@
-"""Exercise the WebSocket protocol without an HTTP test client dependency."""
-
-import asyncio
-import itertools
-import json
 import unittest
-from unittest.mock import patch
 
-from fastapi import WebSocketDisconnect
+from starlette.websockets import WebSocketDisconnect
 
-from backend.main import websocket_endpoint
-from backend.test_rep_counter import frame
-
-
-class FakeWebSocket:
-    def __init__(self, messages):
-        self.messages = iter(messages)
-        self.responses = []
-        self.accepted = False
-
-    async def accept(self):
-        self.accepted = True
-
-    async def receive_text(self):
-        try:
-            return next(self.messages)
-        except StopIteration:
-            raise WebSocketDisconnect()
-
-    async def send_json(self, response):
-        self.responses.append(response)
+from backend.test_helpers import ApiCase
+from backend.test_rep_counter import frame, wire
 
 
-class WebSocketTests(unittest.TestCase):
-    def run_socket(self, messages):
-        socket = FakeWebSocket(messages)
-        ticks = itertools.count()
-        with patch("backend.rep_counter.time.monotonic", side_effect=lambda: next(ticks) * 0.06):
-            asyncio.run(websocket_endpoint(socket))
-        self.assertTrue(socket.accepted)
-        return socket.responses
+class WebSocketTests(ApiCase):
+    def test_authenticated_landmarks_and_sequence_check(self):
+        self.register()
+        session_id = self.start()
+        with self.websocket(session_id) as socket:
+            response = self.pose(socket, 170)
+            self.assertEqual(response["type"], "workout_update")
+            self.assertEqual(response["rep_count"], 0)
+            socket.send_json(wire(frame(90), self.sequence - 1))
+            self.assertEqual(socket.receive_json()["type"], "ignored")
+            self.assertEqual(self.rep(socket)["rep_count"], 1)
+        saved = self.post(f"/api/workouts/{session_id}/finish").json()
+        self.assertEqual((saved["rep_count"], saved["xp_earned"]), (1, 10))
 
-    def test_structured_updates_and_one_count(self):
-        poses = [frame(170)] * 3 + [frame(90)] * 3 + [frame(170)] * 3
-        responses = self.run_socket([json.dumps(pose) for pose in poses])
-        self.assertEqual(len(responses), 9)
-        self.assertEqual(responses[-1]["reps"], 1)
-        self.assertEqual(responses[-1]["state"], "UP")
-        self.assertTrue(responses[-1]["form_valid"])
-        self.assertEqual(responses[-1]["tracking"], "tracked")
-        self.assertIsInstance(responses[-1]["feedback"], str)
-        self.assertEqual(self.run_socket([json.dumps(frame(170))])[-1]["reps"], 0)
+    def test_invalid_frames_never_grant_reps(self):
+        self.register()
+        session_id = self.start()
+        with self.websocket(session_id) as socket:
+            socket.send_text("{")
+            self.assertEqual(socket.receive_json()["type"], "error")
+            socket.send_text("x" * 9000)
+            self.assertEqual(socket.receive_json()["type"], "error")
+            invalid = wire(frame(170), 0)
+            invalid["aspect_ratio"] = float("nan")
+            socket.send_json(invalid)
+            self.assertEqual(socket.receive_json()["type"], "error")
+        self.assertEqual(self.post(f"/api/workouts/{session_id}/finish").json()["xp_earned"], 0)
 
-    def test_bad_json_and_lost_pose_have_safe_responses(self):
-        responses = self.run_socket(["{", json.dumps({"aspect_ratio": 1, "landmarks": None})])
-        self.assertEqual(responses[0]["tracking"], "error")
-        self.assertEqual(responses[0]["reps"], 0)
-        self.assertEqual(responses[1]["tracking"], "lost")
-        self.assertEqual(responses[1]["state"], "UNKNOWN")
+    def test_missing_or_wrong_origin_and_no_auth_are_rejected(self):
+        self.register()
+        session_id = self.start()
+        with self.assertRaises(WebSocketDisconnect) as wrong:
+            with self.websocket(session_id, "https://evil.example") as socket:
+                socket.receive_json()
+        self.assertEqual(wrong.exception.code, 4403)
+        other = self.client.__class__(self.app)
+        with other:
+            with self.assertRaises(WebSocketDisconnect) as unauthenticated:
+                with other.websocket_connect(f"/ws/workouts/{session_id}", headers={"Origin": "http://testserver"}) as socket:
+                    socket.receive_json()
+        self.assertEqual(unauthenticated.exception.code, 4401)
 
-    def test_bad_frame_clears_an_unfinished_rep(self):
-        messages = [json.dumps(frame(170))] * 3
-        messages += [json.dumps(frame(90))] * 3
-        messages += ["not json"]
-        messages += [json.dumps(frame(170))] * 3
-        responses = self.run_socket(messages)
-        self.assertEqual(responses[5]["state"], "DOWN")
-        self.assertEqual(responses[6]["state"], "UNKNOWN")
-        self.assertEqual(responses[-1]["reps"], 0)
+    def test_other_user_socket_and_revoked_login_are_rejected(self):
+        self.register()
+        session_id = self.start()
+        from fastapi.testclient import TestClient
+        with TestClient(self.app) as second:
+            second.post("/api/auth/register", json={"username": "other_student", "password": "password123"})
+            with self.assertRaises(WebSocketDisconnect) as forbidden:
+                with second.websocket_connect(f"/ws/workouts/{session_id}",
+                                              headers={"Origin": "http://testserver"}) as socket:
+                    socket.receive_json()
+            self.assertEqual(forbidden.exception.code, 4404)
+        with self.websocket(session_id) as socket:
+            self.assertEqual(self.post("/api/auth/logout").status_code, 200)
+            socket.send_json(wire(frame(170), 0))
+            with self.assertRaises(WebSocketDisconnect) as revoked:
+                socket.receive_json()
+            self.assertEqual(revoked.exception.code, 4401)
 
 
 if __name__ == "__main__":
