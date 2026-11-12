@@ -10,6 +10,7 @@ type Props = {
   csrfToken: string
   resume?: ActiveWorkout
   onResult: (result: WorkoutResult) => void
+  onSessionStarted?: (session: ActiveWorkout) => void
   onBack: () => void
 }
 
@@ -24,7 +25,7 @@ function workoutSocketUrl(id: number) {
   return `${scheme}//${window.location.host}/ws/workouts/${id}`
 }
 
-export default function PoseDetector({ mode, csrfToken, resume, onResult, onBack }: Props) {
+export default function PoseDetector({ mode, csrfToken, resume, onResult, onSessionStarted, onBack }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -287,6 +288,7 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onBack
       if (!current) {
         current = await api.start(mode, csrfToken)
         setSession(current)
+        onSessionStarted?.(current)
         sessionStorage.setItem('repscv_workout_id', String(current.id))
         setReps(0)
         const remainingMs = (current as StartResponse).remaining_ms

@@ -5,6 +5,10 @@ FastAPI workout engine. Camera video stays in the browser. Python validates the
 pose, counts repetitions, controls workout timing, and saves eligible results
 and XP to SQLite. The old project name in `spec.md` refers to RepsCV.
 
+The app now has five main screens: Dashboard, Workout, History, weekly global
+Leaderboard, and Profile. The workout result has its own linkable screen.
+Navigation uses URL hashes, so refreshes preserve the selected screen.
+
 ## Local setup
 
 Use Python 3.13, Node.js 24, and `uv`. From the repository root:
@@ -83,15 +87,39 @@ recovered. Duplicate Finish/End requests return the same saved result. A
 normal workout abandoned without Finish stays active until the user returns
 and finishes it; there is no invented pause or timeout.
 
+The app warns before leaving an active workout. Confirming navigation away
+from an active Max Set closes its WebSocket and interrupts the attempt;
+Normal Workout remains active and can be resumed from Dashboard. The result
+screen links back to Dashboard and History or starts another workout. History
+shows completed workouts only, newest first, using the browser's local timezone.
+The Profile screen edits or clears the optional department and logs out.
+
+Dashboard statistics are calculated from saved workouts and XP transactions:
+lifetime XP, XP in the current Taiwan week, valid reps, completed Max Set PB,
+and five recent completed workouts. The global leaderboard includes registered
+users with zero XP, ranks them by XP transactions in the current Taiwan week,
+gives equal XP equal competition ranks, and orders ties by username. The week
+runs Monday 00:00 through the next Monday 00:00 in Asia/Taipei; timestamps are
+stored and queried in UTC. Reading Dashboard or Leaderboard never awards XP.
+
 ## API and WebSocket
 
 HTTP: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`,
 `GET /api/auth/me`, `PATCH /api/profile`, `POST /api/workouts/start`,
-`POST /api/workouts/{id}/finish`, and `GET /api/workouts`. The additional
+`POST /api/workouts/{id}/finish`, `GET /api/workouts`, `GET /api/dashboard`,
+and `GET /api/leaderboard?period=weekly`. The additional
 read-only `GET /api/workouts/{id}` returns active status or a terminal result,
 including interrupted attempts, so the client can recover after a disconnect.
 Start accepts `{ "exercise": "pushup", "mode": "normal" | "max_set" }`.
 Finish accepts no rep or XP fields.
+
+`GET /api/dashboard` returns `username`, `lifetime_xp`, `weekly_xp`,
+`total_pushups`, `max_set_personal_best`, `recent_workouts`, `week_start`,
+`week_end`, and `timezone`. `GET /api/leaderboard?period=weekly` returns the
+week bounds, `current_user_rank`, and ordered `entries` containing rank,
+username, weekly XP, and a current-user marker. Both endpoints require login.
+No schema migration is needed for these read-only views; they use the existing
+users, workouts, and XP transaction tables.
 
 Connect to `/ws/workouts/{id}` after Start. A frame is:
 
@@ -148,9 +176,14 @@ with the TA.
    should show 0 XP and no PB.
 5. Repeat Finish/End or refresh a result; XP and the saved workout must appear
    only once. Check the layout at 360–390 CSS pixels wide.
+6. From Dashboard, verify the new stats and recent session. Open History, the
+   saved result detail, and Leaderboard; check your rank and the Taipei week.
+   Log out and back in to confirm all records remain. Edit and clear department
+   in Profile. Try navigation during a Max Set and confirm the interruption
+   warning behaves as expected.
 
 Automated tests use synthetic landmarks and a simulated camera protocol. The
 existing detector was reportedly camera-tested before this lifecycle change;
-the complete new flow still needs real-phone validation, including framing,
-timing, network loss, and HTTPS cookies. No real-device accuracy claim follows
-from these automated checks.
+the new routed flow still needs real-phone validation, including navigation,
+small-screen layout, network loss, and HTTPS cookies. No real-device accuracy
+claim follows from these automated checks.

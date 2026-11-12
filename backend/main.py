@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from backend.database import Base, LoginSession, User, make_database, utcnow
+from backend.statistics import dashboard as dashboard_summary, weekly_leaderboard, workout_history
 from backend.workouts import WorkoutLimits, WorkoutManager, validate_pose_message
 
 
@@ -197,7 +198,19 @@ def create_app(database_url=None, clock=None, limits=None):
     @application.get("/api/workouts")
     def workouts(request: Request):
         user, _ = auth(request)
-        return manager.history(user.id)
+        return workout_history(session_factory, user.id)
+
+    @application.get("/api/dashboard")
+    def dashboard(request: Request):
+        user, _ = auth(request)
+        return dashboard_summary(session_factory, user, manager.clock.utcnow())
+
+    @application.get("/api/leaderboard")
+    def leaderboard(request: Request, period: str = "weekly"):
+        user, _ = auth(request)
+        if period != "weekly":
+            raise HTTPException(422, "Only the weekly leaderboard is available.")
+        return weekly_leaderboard(session_factory, user.id, manager.clock.utcnow())
 
     @application.get("/api/workouts/{session_id}")
     async def workout_status(session_id: int, request: Request):

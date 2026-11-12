@@ -7,6 +7,24 @@ export type WorkoutResult = {
   new_personal_best: boolean; completed_at: string | null
 }
 export type StartResponse = ActiveWorkout & { remaining_ms: number | null }
+export type DashboardSummary = {
+  username: string
+  lifetime_xp: number
+  weekly_xp: number
+  total_pushups: number
+  max_set_personal_best: number | null
+  recent_workouts: WorkoutResult[]
+  week_start: string
+  week_end: string
+  timezone: 'Asia/Taipei'
+}
+export type LeaderboardEntry = {
+  rank: number; user_id: number; username: string; weekly_xp: number; is_current_user: boolean
+}
+export type WeeklyLeaderboard = {
+  period: 'weekly'; week_start: string; week_end: string; timezone: 'Asia/Taipei'
+  current_user_rank: number | null; entries: LeaderboardEntry[]
+}
 
 async function request<T>(path: string, method = 'GET', body?: unknown, csrfToken?: string): Promise<T> {
   const response = await fetch(path, {
@@ -31,4 +49,6 @@ export const api = {
   finish: (id: number, csrf: string) => request<WorkoutResult>(`/api/workouts/${id}/finish`, 'POST', undefined, csrf),
   status: (id: number) => request<ActiveWorkout | WorkoutResult>(`/api/workouts/${id}`),
   history: () => request<WorkoutResult[]>('/api/workouts'),
+  dashboard: () => request<DashboardSummary>('/api/dashboard'),
+  leaderboard: () => request<WeeklyLeaderboard>('/api/leaderboard?period=weekly'),
 }
