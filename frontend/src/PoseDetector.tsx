@@ -117,9 +117,12 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
   }
 
   async function pollMaxSetResult(id: number) {
+    const generation = sessionGeneration.current
     for (let attempt = 0; attempt < 10 && !finishedRef.current; attempt++) {
+      if (generation !== sessionGeneration.current) return
       try {
         const current = await api.status(id)
+        if (generation !== sessionGeneration.current) return
         if (current.status !== 'active') {
           showResult(current as WorkoutResult)
           return
@@ -127,7 +130,7 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
       } catch { /* Retry while the server finishes the disconnect. */ }
       await new Promise((resolve) => setTimeout(resolve, 500))
     }
-    if (!finishedRef.current) setFeedback('Connection lost. Reload to check the Max Set result.')
+    if (generation === sessionGeneration.current && !finishedRef.current) setFeedback('Connection lost. Reload to check the Max Set result.')
   }
 
   function connectSocket(id: number) {
@@ -163,13 +166,17 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
       } catch { setFeedback('Invalid response from Python.') }
     }
     socket.onerror = () => setStatus('Python connection error')
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (socketRef.current === socket) socketRef.current = null
       setConnected(false)
       if (finishedRef.current || workoutIdRef.current !== id) return
       setStatus('Disconnected')
       setTracking('Disconnected')
       setFormValid(false)
+      if ([4401, 4403, 4404, 4409].includes(event.code)) {
+        setFeedback('Session unavailable or expired. Reload and sign in to recover your workout.')
+        return
+      }
       if (mode === 'max_set') {
         setFeedback('Max Set interrupted by the connection loss.')
         void pollMaxSetResult(id)
@@ -213,10 +220,10 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
       await video.play()
       if (!current()) return
       setStatus('Loading pose model…')
-      const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.0/wasm')
+      const vision = await FilesetResolver.forVisionTasks('/mediapipe/wasm')
       if (!current()) return
       const model = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task' },
+        baseOptions: { modelAssetPath: '/mediapipe/pose_landmarker_lite.task' },
         runningMode: 'VIDEO', numPoses: 1,
       })
       if (!current()) { model.close(); return }
@@ -225,8 +232,14 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
       setReady(true)
       setStatus('Camera ready')
 
+      let lastInference = 0
       const trackFrame = () => {
         if (!current() || !cameraActive.current) return
+        if (performance.now() - lastInference < 80) {
+          frameRef.current = requestAnimationFrame(trackFrame)
+          return
+        }
+        lastInference = performance.now()
         try {
           const video = videoRef.current
           if (video && video.readyState >= 2 && video.videoHeight > 0) {
@@ -281,15 +294,17 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
 
   async function startWorkout() {
     if (!ready || !poseSeen || workingRef.current || finishedRef.current) return
+    const generation = sessionGeneration.current
     workingRef.current = true
     setWorking(true)
     try {
       let current = session
       if (!current) {
         current = await api.start(mode, csrfToken)
-        setSession(current)
         onSessionStarted?.(current)
         sessionStorage.setItem('repscv_workout_id', String(current.id))
+        if (generation !== sessionGeneration.current) return
+        setSession(current)
         setReps(0)
         const remainingMs = (current as StartResponse).remaining_ms
         if (remainingMs !== null) {

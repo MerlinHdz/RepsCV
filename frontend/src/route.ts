@@ -2,7 +2,7 @@ export type RouteName = 'dashboard' | 'workout' | 'history' | 'leaderboard' | 'p
 export type Route = { name: RouteName; sessionId?: number }
 
 export function parseRoute(hash: string): Route {
-  const path = hash.replace(/^#\/?/, '').replace(/\/+$/, '')
+  const path = hash.replace(/^#?\/?/, '').replace(/\/+$/, '')
   if (path === 'workout' || path === 'history' || path === 'leaderboard' || path === 'profile') {
     return { name: path }
   }

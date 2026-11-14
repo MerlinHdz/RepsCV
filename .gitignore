@@ -223,3 +223,10 @@ __marimo__/
 spec.md
 repscv.db
 repscv.db-*
+*.sqlite*
+*.db
+*.db-*
+.env.*
+!.env.example
+frontend/public/mediapipe/
+/docs

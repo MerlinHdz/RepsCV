@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 import os
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -80,4 +80,8 @@ def database_url():
 def make_database(url=None):
     url = url or database_url()
     engine = create_engine(url, connect_args={"check_same_thread": False} if url.startswith("sqlite") else {})
+    @event.listens_for(engine, "connect")
+    def sqlite_options(connection, record):
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA busy_timeout=5000")
     return engine, sessionmaker(engine, expire_on_commit=False)

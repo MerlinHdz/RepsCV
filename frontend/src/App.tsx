@@ -36,7 +36,7 @@ function App() {
   const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null)
   const [selectedMode, setSelectedMode] = useState<Mode | null>(null)
   const [resultCache, setResultCache] = useState<WorkoutResult | null>(null)
-  const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash))
+  const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash || window.location.pathname))
   const routeRef = useRef(route)
   const activeRef = useRef<ActiveWorkout | null>(null)
 
@@ -64,7 +64,7 @@ function App() {
 
   useEffect(() => {
     const handleHash = () => {
-      const next = parseRoute(window.location.hash)
+      const next = parseRoute(window.location.hash || window.location.pathname)
       const previous = routeRef.current
       if (routeHash(next) === routeHash(previous)) return
       const active = activeRef.current

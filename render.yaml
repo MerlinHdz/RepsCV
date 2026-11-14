@@ -1,0 +1,23 @@
+# Paid candidate configuration. Creating this Blueprint incurs charges; review first.
+services:
+  - type: web
+    name: repscv
+    runtime: docker
+    plan: starter
+    region: singapore
+    numInstances: 1
+    autoDeployTrigger: 'off'
+    healthCheckPath: /api/health
+    disk:
+      name: repscv-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: REPSCV_ENV
+        value: production
+      - key: REPSCV_PUBLIC_ORIGIN
+        sync: false
+      - key: REPSCV_DATABASE_URL
+        value: sqlite:////data/repscv.db
+      - key: REPSCV_PROXY_IPS
+        value: '*'

@@ -8,7 +8,7 @@ import time
 
 from fastapi import HTTPException, WebSocketDisconnect
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from backend.database import Workout, WorkoutSession, XPTransaction, utcnow
 from backend.rep_counter import RepCounter
@@ -37,6 +37,7 @@ class Runtime:
     deadline_mono: float | None
     last_good_mono: float
     last_sequence: int = -1
+    storage_failed: bool = False
     socket: object | None = None
     timer: asyncio.Task | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -145,8 +146,14 @@ class WorkoutManager:
         try:
             while True:
                 await asyncio.sleep(self.limits.timer_poll_seconds)
-                if await self.tick(session_id, user_id):
-                    return
+                try:
+                    if await self.tick(session_id, user_id):
+                        return
+                except SQLAlchemyError:
+                    # Keep trying to persist an interrupted result when storage returns.
+                    runtime = self.runtimes.get(session_id)
+                    if runtime:
+                        runtime.storage_failed = True
         except asyncio.CancelledError:
             return
 
@@ -162,6 +169,8 @@ class WorkoutManager:
         return False
 
     def _terminal_reason(self, runtime, now):
+        if runtime.storage_failed:
+            return "interrupted"
         if runtime.mode != "max_set":
             return None
         lost_at = runtime.last_good_mono + self.limits.tracking_loss_seconds
