@@ -9,6 +9,10 @@ The app now has five main screens: Dashboard, Workout, History, weekly global
 Leaderboard, and Profile. The workout result has its own linkable screen.
 Navigation uses URL hashes, so refreshes preserve the selected screen.
 
+For production, follow [the deployment and recovery guide](docs/DEPLOYMENT.md).
+It covers the paid hosting candidate, Docker, persistent storage, backups,
+troubleshooting and the November 24 checklist. Deployment is prepared, not live.
+
 ## Local setup
 
 Use Python 3.13, Node.js 24, and `uv`. From the repository root:
@@ -33,8 +37,9 @@ serve the built frontend and proxy `/api` and `/ws` through one HTTPS domain.
 Set `REPSCV_SECURE_COOKIES=1` when TLS terminates before FastAPI, and configure
 the reverse proxy to pass the original Host, Origin, and protocol. `REPSCV_ALLOWED_ORIGINS`
 may contain comma-separated additional trusted origins. Camera access requires
-HTTPS or localhost. MediaPipe WASM and its model currently load from external
-URLs, so an internet connection is needed.
+HTTPS or localhost. MediaPipe WASM and its checksum-verified model are bundled during npm dev/build
+and served from this same origin. Internet is needed for the first build;
+camera video/audio are never uploaded. Python 3 must be available to npm scripts.
 
 `REPSCV_DATABASE_URL` defaults to `sqlite:///./repscv.db`. `backend.init_db`
 and app startup call SQLAlchemy `create_all`, which creates missing tables and
@@ -153,6 +158,7 @@ npm run build
 cd ..
 git diff --check
 python3 scripts/source_share.py
+uv run python scripts/smoke_production.py
 ```
 
 `scripts/source_share.py` counts first-party Git tracked and currently untracked
