@@ -1,5 +1,5 @@
 FROM node:24-bookworm-slim AS frontend
-RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3 ca-certificates && update-ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /build/frontend
 COPY frontend/package*.json ./
 RUN npm ci
