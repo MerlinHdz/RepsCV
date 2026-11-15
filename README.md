@@ -1,29 +1,106 @@
 # RepsCV
 
-RepsCV tracks push-ups with browser-based MediaPipe landmarks and a Python
-FastAPI workout engine. Camera video stays in the browser. Python validates the
-pose, counts repetitions, controls workout timing, and saves eligible results
-and XP to SQLite. The old project name in `spec.md` refers to RepsCV.
+**Track your push-ups. Save your progress. Make every rep count.**
 
-The app now has five main screens: Dashboard, Workout, History, weekly global
-Leaderboard, and Profile. The workout result has its own linkable screen.
-Navigation uses URL hashes, so refreshes preserve the selected screen.
+[**Open RepsCV →**](https://repscv.onrender.com/)
 
-For production, follow [the deployment and recovery guide](docs/DEPLOYMENT.md).
-It covers the paid hosting candidate, Docker, persistent storage, backups,
-troubleshooting and the November 24 checklist. Deployment is prepared, not live.
+RepsCV is a mobile-first fitness web app that uses your camera to track push-ups
+and give live feedback. Complete workouts, earn XP, build your personal record,
+and see where you stand on the weekly leaderboard—all from your browser.
 
-## Local setup
+## Try it
 
-Use Python 3.13, Node.js 24, and `uv`. From the repository root:
+1. Open [repscv.onrender.com](https://repscv.onrender.com/) and create an account.
+2. Choose Push-ups and select Normal Workout or Max Set.
+3. Allow camera access and position your phone to the side, with your full body visible.
+4. Check the preview and tracking feedback, then start your workout.
+5. Finish your session and review your results, dashboard, and history.
+
+Use Safari on iPhone or Chrome on Android as a starting point. A stable internet
+connection is required for live counting. Tracking depends on lighting, framing,
+and how clearly the camera can see your body.
+
+## Features
+
+- **Live tracking:** camera preview, skeleton overlay, server-counted reps, and form feedback.
+- **Normal Workout:** train at your pace with unlimited rest; press Finish when done.
+- **Max Set:** complete your first rep within 20 seconds, then each next rep within 5 seconds.
+- **Saved progress:** workout results, history, lifetime XP, and completed Max Set personal bests.
+- **Dashboard:** recent workouts, total valid push-ups, and weekly progress.
+- **Weekly leaderboard:** rank by earned XP, with equal XP sharing the same rank.
+- **Profile:** account details and an optional, editable NTHU department.
+
+Completed workouts earn **10 XP per accepted push-up**. A zero-rep workout can
+be saved and earns zero XP. Interrupted Max Sets earn no XP or personal best.
+Max Sets are interrupted by a dropped workout connection or prolonged tracking
+loss, so keep the workout page open while exercising.
+
+The leaderboard week runs from Monday at 00:00 to the following Monday at 00:00
+in **Asia/Taipei**. Workout history displays times in your device’s timezone.
+
+## How it works
+
+```text
+Phone camera → MediaPipe pose landmarks → WebSocket → Python workout engine
+                                                         ↓
+React interface ← live rep count and feedback       SQLite results and XP
+```
+
+MediaPipe Pose Landmarker runs in the browser. The frontend sends selected body
+landmarks and confidence values to Python, which validates posture and counts a
+stable top–bottom–top movement as one repetition. Python also controls workout
+deadlines, finalization, XP, and personal-best eligibility.
+
+**Camera video stays on your device.** Audio is disabled, and the app does not
+record or upload video. Body coordinates are transmitted to the backend for
+live validation and counting.
+
+| Layer | Technology |
+| --- | --- |
+| Interface | React, TypeScript, Vite |
+| Browser pose estimation | MediaPipe Pose Landmarker |
+| API and live workout engine | Python, FastAPI, WebSockets |
+| Data storage | SQLite, SQLAlchemy |
+| Password hashing | Argon2 |
+
+## Run locally with Docker
+
+Install and start Docker, then run these commands from the repository root:
 
 ```sh
-uv sync
+docker build -t repscv .
+docker volume create repscv-data
+docker run --rm --name repscv -p 8000:8000 \
+  --mount source=repscv-data,target=/data \
+  -e REPSCV_DATABASE_URL=sqlite:////data/repscv.db repscv
+```
+
+Open **http://localhost:8000**. Camera access works on localhost without HTTPS.
+If port 8000 is already in use, stop the other server first or change the port
+mapping to `-p 8001:8000` and open http://localhost:8001.
+
+The named Docker volume preserves accounts and workouts when the container
+stops. It uses a separate database from a native local checkout. Press `Ctrl+C`
+to stop the app; rerun the `docker run` command to start it again. Keep the volume
+to retain your data.
+
+The first build needs internet access to install dependencies and download the
+pose model. Model and WASM assets are then bundled with the application.
+
+## Development setup
+
+Prerequisites: **Python 3.13**, **Node.js 24**, and **uv**. Python 3 must also be
+available as `python3` for the frontend asset preparation script.
+
+From the repository root, start the backend:
+
+```sh
+uv sync --frozen
 uv run python -m backend.init_db
 uv run uvicorn backend.main:app --reload
 ```
 
-In another terminal:
+In a second terminal, start the frontend:
 
 ```sh
 cd frontend
@@ -31,165 +108,63 @@ npm ci
 npm run dev
 ```
 
-Open the Vite URL on localhost. Vite proxies `/api` and `/ws` to FastAPI on
-port 8000, so cookies and WebSockets stay on one browser origin. For a phone,
-serve the built frontend and proxy `/api` and `/ws` through one HTTPS domain.
-Set `REPSCV_SECURE_COOKIES=1` when TLS terminates before FastAPI, and configure
-the reverse proxy to pass the original Host, Origin, and protocol. `REPSCV_ALLOWED_ORIGINS`
-may contain comma-separated additional trusted origins. Camera access requires
-HTTPS or localhost. MediaPipe WASM and its checksum-verified model are bundled during npm dev/build
-and served from this same origin. Internet is needed for the first build;
-camera video/audio are never uploaded. Python 3 must be available to npm scripts.
+Open the localhost URL printed by Vite. Its development proxy forwards API and
+WebSocket traffic to the backend on port 8000. The native development database
+is `repscv.db` in the repository root; initialization creates missing tables
+without resetting existing data.
 
-`REPSCV_DATABASE_URL` defaults to `sqlite:///./repscv.db`. `backend.init_db`
-and app startup call SQLAlchemy `create_all`, which creates missing tables and
-indexes without deleting data. This is the initial schema approach; it does
-not modify existing columns. Back up the SQLite file and add a migration before
-changing this schema in a later version. Run one FastAPI process for this MVP:
-Max Set deadlines and active pose counters live in that process. Multiple
-workers would need shared coordination and are unsupported.
+To use the built frontend locally instead of Vite:
 
-## Workout behavior
-
-Registering signs the user in. The login cookie is HTTP-only, SameSite=Lax,
-and Secure on HTTPS or with `REPSCV_SECURE_COOKIES=1`. Its random token is
-stored only as a SHA-256 hash in `login_sessions`; passwords use Argon2. State
-changing HTTP requests require the `X-CSRF-Token` returned by login/register
-or `/api/auth/me`. WebSockets require the cookie, the exact allowed Origin,
-and ownership of an active workout.
-
-The user chooses Push-ups and a mode, prepares the camera, then presses Start.
-The server allows one active workout per user. Normal Workout has unlimited
-rest and ends only on explicit Finish; zero reps save with zero XP. Max Set
-requires a first accepted rep within 20 seconds, then another within 5 seconds
-of each accepted rep. A 0.2-second server timer enforces deadlines without
-waiting for another frame. Tracking unusable for more than 2 seconds or a
-WebSocket disconnect interrupts Max Set. These limits are in `WorkoutLimits`
-in `backend/workouts.py`.
-
-The Python pose detector in `backend/rep_counter.py` retains its stable
-top/bottom/top counting and form checks. The browser sends only landmark
-coordinates, confidence, video aspect ratio, and a connection-local sequence
-number. The server ignores duplicate/stale sequences and rejects messages over
-8 KiB. Browser timestamps are diagnostic only; all decisions use server time.
-
-Completed workouts insert a result and one XP transaction in one database
-transaction. XP is exactly `10 × accepted reps`, including a zero-amount
-transaction for a completed zero-rep workout. Database uniqueness on
-`workouts.session_id` and `xp_transactions.workout_id` prevents duplicate
-awards. Interrupted attempts remain in `workout_sessions` for diagnosis but do
-not appear in official history, earn XP, or establish a personal best. A Max
-Set PB is earned only when a completed result strictly exceeds earlier saved
-Max Set results; ties do not create a new PB.
-
-Normal Workout survives navigation or refresh: `/api/auth/me` returns the
-active session, its saved rep count, and the browser can prepare the camera and
-reconnect to that same session. The pose phase is re-established after a long
-tracking gap. A Max Set refresh closes its WebSocket and interrupts the set;
-the UI reads the terminal status. An active Max Set left by a server restart
-is marked interrupted at startup because its monotonic deadline cannot be
-recovered. Duplicate Finish/End requests return the same saved result. A
-normal workout abandoned without Finish stays active until the user returns
-and finishes it; there is no invented pause or timeout.
-
-The app warns before leaving an active workout. Confirming navigation away
-from an active Max Set closes its WebSocket and interrupts the attempt;
-Normal Workout remains active and can be resumed from Dashboard. The result
-screen links back to Dashboard and History or starts another workout. History
-shows completed workouts only, newest first, using the browser's local timezone.
-The Profile screen edits or clears the optional department and logs out.
-
-Dashboard statistics are calculated from saved workouts and XP transactions:
-lifetime XP, XP in the current Taiwan week, valid reps, completed Max Set PB,
-and five recent completed workouts. The global leaderboard includes registered
-users with zero XP, ranks them by XP transactions in the current Taiwan week,
-gives equal XP equal competition ranks, and orders ties by username. The week
-runs Monday 00:00 through the next Monday 00:00 in Asia/Taipei; timestamps are
-stored and queried in UTC. Reading Dashboard or Leaderboard never awards XP.
-
-## API and WebSocket
-
-HTTP: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`,
-`GET /api/auth/me`, `PATCH /api/profile`, `POST /api/workouts/start`,
-`POST /api/workouts/{id}/finish`, `GET /api/workouts`, `GET /api/dashboard`,
-and `GET /api/leaderboard?period=weekly`. The additional
-read-only `GET /api/workouts/{id}` returns active status or a terminal result,
-including interrupted attempts, so the client can recover after a disconnect.
-Start accepts `{ "exercise": "pushup", "mode": "normal" | "max_set" }`.
-Finish accepts no rep or XP fields.
-
-`GET /api/dashboard` returns `username`, `lifetime_xp`, `weekly_xp`,
-`total_pushups`, `max_set_personal_best`, `recent_workouts`, `week_start`,
-`week_end`, and `timezone`. `GET /api/leaderboard?period=weekly` returns the
-week bounds, `current_user_rank`, and ordered `entries` containing rank,
-username, weekly XP, and a current-user marker. Both endpoints require login.
-No schema migration is needed for these read-only views; they use the existing
-users, workouts, and XP transaction tables.
-
-Connect to `/ws/workouts/{id}` after Start. A frame is:
-
-```json
-{
-  "type": "landmarks",
-  "sequence": 42,
-  "timestamp_ms": 2800,
-  "aspect_ratio": 1.333,
-  "points": {
-    "left_shoulder": {"x": 0.42, "y": 0.35, "visibility": 0.98, "presence": 0.98}
-  }
-}
+```sh
+cd frontend
+npm run build
+cd ..
+uv run python -m backend.serve
 ```
 
-`points: null` reports no pose. The production client sends both sides' needed
-landmarks when available. Server events are `workout_update` with `rep_count`,
-`phase`, `tracking`, `form_valid`, `feedback`, `elapsed_ms`, and `remaining_ms`;
-`workout_result` on terminal completion/interruption; or `error`/`ignored` for
-bad or duplicate frames. The existing detector uses `UNKNOWN`, `UP`, and
-`DOWN` phase names.
+Stop the development backend first if it is using port 8000, then open
+http://localhost:8000. Run one backend process: active workout counters and
+timers currently live in that process’s memory.
 
-## Tests and source share
+## Checks
+
+Run the Python tests from the repository root:
 
 ```sh
 uv run python -m unittest discover -s backend -p 'test_*.py' -v
+```
+
+Run frontend tests, lint, and the TypeScript/production build:
+
+```sh
 cd frontend
 npm test
 npm run lint
 npm run build
 cd ..
 git diff --check
-python3 scripts/source_share.py
-uv run python scripts/smoke_production.py
 ```
 
-`scripts/source_share.py` counts first-party Git tracked and currently untracked
-reviewable `.py`, `.js`, `.jsx`, `.mjs`, `.ts`, `.tsx`, `.html`, and `.css`
-files by source lines and UTF-8 bytes. It excludes dependencies, build output,
-generated files, lockfiles, and binary assets. This is the specification's
-internal metric; the course's official measurement method should be confirmed
-with the TA.
+Additional checks from the repository root:
 
-### Manual acceptance check
+```sh
+uv run python scripts/smoke_production.py
+python3 scripts/source_share.py
+```
 
-1. On localhost or an HTTPS phone deployment, register, log out, log back in,
-   and change the optional department.
-2. Choose Normal Workout, allow camera access, confirm preview and skeleton,
-   start, perform push-ups, rest, and press Finish. Check the result and saved
-   entry after refresh. Also finish a zero-rep Normal Workout.
-3. Start another Normal Workout, complete a rep, refresh, prepare the camera,
-   reconnect, and verify the count continues from the server session.
-4. Choose Max Set, verify the prominent countdown, complete reps, and use End.
-   Repeat with a timeout, then with camera/WebSocket loss; interrupted attempts
-   should show 0 XP and no PB.
-5. Repeat Finish/End or refresh a result; XP and the saved workout must appear
-   only once. Check the layout at 360–390 CSS pixels wide.
-6. From Dashboard, verify the new stats and recent session. Open History, the
-   saved result detail, and Leaderboard; check your rank and the Taipei week.
-   Log out and back in to confirm all records remain. Edit and clear department
-   in Profile. Try navigation during a Max Set and confirm the interruption
-   warning behaves as expected.
+The smoke test uses a disposable local HTTPS server, certificate, and database;
+it requires OpenSSL. The source-share script reports first-party source lines
+and bytes, excluding dependencies and generated output.
 
-Automated tests use synthetic landmarks and a simulated camera protocol. The
-existing detector was reportedly camera-tested before this lifecycle change;
-the new routed flow still needs real-phone validation, including navigation,
-small-screen layout, network loss, and HTTPS cookies. No real-device accuracy
-claim follows from these automated checks.
+## Project structure
+
+```text
+backend/       Pose validation, rep counting, sessions, authentication, data APIs
+frontend/      React screens, camera access, MediaPipe, skeleton overlay
+scripts/       Pose asset preparation, source measurement, local smoke test
+Dockerfile     Reproducible frontend build and Python runtime
+```
+
+RepsCV currently supports push-ups in Normal Workout and Max Set modes. Pose
+checks are camera-based estimates; automated tests verify defined movement and
+session rules, rather than establishing a real-world accuracy percentage.
