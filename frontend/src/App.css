@@ -144,46 +144,62 @@
 .mode-options button > span:nth-last-child(2) { max-width: 15rem; color: var(--muted); font-size: .82rem; }
 .mode-arrow { position: absolute; right: 20px; bottom: 17px; color: var(--accent); font-size: 1.8rem; }
 
-/* Existing camera and tracking engine */
-.detector header { margin-bottom: 20px; }
-.detector header h1 { margin: 0 0 7px; font-size: clamp(2rem, 8vw, 3rem); letter-spacing: -.07em; line-height: 1; }
-.detector header > p:last-child { color: var(--muted); margin: 0; }
-.detector .dashboard { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin-bottom: 12px; }
-.count-card, .status-card { border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: var(--surface); }
-.count-card { display: flex; flex-direction: column; justify-content: center; }
-.count-card span, .count-card small, .status-card .label { color: var(--muted); }
-.count-card strong { color: var(--accent); font-size: clamp(3rem, 13vw, 5rem); line-height: 1.08; }
-.status-card { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.status-card p { display: flex; flex-direction: column; margin: 0; min-width: 0; }
-.status-card strong { font-size: .82rem; overflow-wrap: anywhere; }
-.status-card .label { font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; }
-.timers { display: flex; gap: 10px; margin-bottom: 12px; }
-.timers p { flex: 1; display: flex; justify-content: space-between; margin: 0; padding: 10px 13px; border-radius: 12px; background: var(--surface); color: var(--muted); }
-.timers strong { color: var(--text); font-size: 1.2rem; }
-.timers .countdown { background: #30391e; color: var(--accent); }
-.timers .countdown strong { color: var(--accent); }
-.camera-frame { position: relative; aspect-ratio: 4 / 3; max-height: 65vh; display: grid; place-items: center; overflow: hidden; border-radius: 18px; background: #050909; border: 1px solid var(--line); }
+/* Focused camera workspace: metrics and controls share the viewport. */
+.app-shell--workout { --workout-header-height: 56px; }
+.app-shell--workout .app-header { height: var(--workout-header-height); }
+.app-shell--workout .app-main { max-width: 1280px; padding-bottom: 0; }
+.detector {
+  height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
+  display: grid;
+  grid-template-rows: auto minmax(140px, 1fr) auto;
+  gap: 10px;
+  padding: 12px 14px max(12px, env(safe-area-inset-bottom));
+  animation: none;
+}
+.workout-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.workout-heading .eyebrow { margin: 0 0 2px; font-size: .62rem; }
+.workout-heading h1 { margin: 0; font-size: 1.25rem; line-height: 1.2; letter-spacing: -.04em; }
+.workout-stage { color: var(--muted); font-size: .75rem; }
+.camera-frame { position: relative; min-height: 0; min-width: 0; display: grid; place-items: center; overflow: hidden; border-radius: 18px; background: #050909; border: 1px solid var(--line); }
 .camera-frame video, .camera-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .camera-frame canvas { pointer-events: none; }
-.camera-placeholder { color: var(--muted); }
-.feedback { margin: 12px 0; min-height: 58px; display: flex; align-items: center; padding: 12px 14px; border-radius: 12px; color: var(--aqua); background: #172c2b; font-weight: 700; }
-.actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.actions button { min-height: 48px; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--accent); color: #162014; font-weight: 850; }
-.actions .secondary { color: var(--text); background: var(--surface); border: 1px solid var(--line); }
+.camera-placeholder { display: grid; gap: 6px; text-align: center; color: var(--muted); padding: 56px 16px; }
+.camera-placeholder > span { color: var(--text); font-weight: 750; }
+.camera-placeholder small { font-size: .75rem; }
+.camera-status { position: absolute; top: 12px; left: 12px; min-height: 32px; padding: 6px 10px; display: flex; align-items: center; gap: 7px; border-radius: 9px; background: #0b1113ed; color: var(--text); font-size: .72rem; }
+.camera-status > span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.camera-status.is-connected > span { background: var(--accent); }
+.workout-details { position: absolute; top: 8px; right: 8px; max-width: calc(100% - 16px); border-radius: 12px; background: #0b1113ed; color: var(--text); font-size: .75rem; }
+.workout-details summary { min-height: 44px; padding: 12px; cursor: pointer; text-align: right; }
+.workout-details summary:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 12px; }
+.workout-details[open] { width: 270px; max-height: calc(100% - 16px); overflow-y: auto; border: 1px solid var(--line); }
+.workout-details dl { margin: 0; padding: 0 12px 12px; }
+.workout-details dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 5px 0; }
+.workout-details dt { color: var(--muted); }
+.workout-details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.workout-console { min-width: 0; display: grid; gap: 10px; }
+.workout-metrics { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-variant-numeric: tabular-nums; }
+.workout-reps { display: flex; flex-direction: column; min-width: 0; }
+.workout-reps > span, .workout-time > span { font-size: .68rem; color: var(--muted); }
+.workout-reps strong { color: var(--accent); font-size: clamp(3.5rem, 16vw, 5rem); line-height: 1; letter-spacing: -.06em; }
+.workout-time { display: flex; flex-direction: column; gap: 2px; }
+.workout-time strong { font-size: clamp(1.2rem, 5vw, 1.75rem); line-height: 1.1; white-space: nowrap; }
+.workout-time.countdown { padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
+.workout-time.countdown strong { color: var(--accent); }
+.detector .feedback { margin: 0; min-height: 48px; padding: 10px 12px; border-radius: 12px; color: var(--aqua); background: var(--surface); font-size: .82rem; line-height: 1.4; overflow-wrap: anywhere; }
+.workout-actions { display: flex; gap: 10px; }
+.workout-actions button { flex: 1.4; min-width: 0; min-height: 52px; border: 0; border-radius: 12px; padding: 10px 12px; background: var(--accent); color: #162014; font-weight: 850; font-size: .94rem; }
+.workout-actions .secondary { flex: 1; color: var(--text); background: var(--surface); border: 1px solid var(--line); }
 
 @keyframes arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .screen, .detector { animation: none; } .weekly-track span { transition: none; } }
 @media (max-width: 420px) {
   .header-caption { display: none; }
-  .detector .dashboard { grid-template-columns: 1fr; }
-  .count-card { align-items: center; min-height: 105px; }
-  .count-card strong { font-size: 3.8rem; }
-  .count-card small { display: none; }
-  .status-card { min-height: 105px; }
   .workout-item-main small { font-size: .65rem; }
 }
 @media (min-width: 700px) {
-  .screen, .detector { padding: 42px 32px 70px; }
+  .screen { padding: 42px 32px 70px; }
   .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .mode-options { grid-template-columns: 1fr 1fr; }
   .auth-layout { grid-template-columns: 1fr 1fr; align-items: center; min-height: 100svh; }
@@ -192,4 +208,17 @@
   .auth-card { padding: 28px; }
   .result-actions { grid-template-columns: repeat(3, 1fr); }
   .bottom-nav { left: 50%; right: auto; bottom: 16px; transform: translateX(-50%); width: min(660px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 18px; padding: 7px; box-shadow: 0 16px 45px #0008; }
+}
+
+/* Wide and short screens give preview and console their own columns. */
+@media (min-width: 900px), (orientation: landscape) and (max-height: 600px) {
+  .detector { grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); grid-template-rows: auto minmax(140px, 1fr); gap: 12px 20px; }
+  .workout-heading { grid-column: 1 / -1; }
+  .workout-console { align-self: center; }
+}
+@media (max-height: 500px) {
+  .detector { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); gap: 8px 14px; }
+  .workout-console { gap: 8px; }
+  .workout-reps strong { font-size: 2.75rem; }
+  .workout-actions button { min-height: 48px; }
 }

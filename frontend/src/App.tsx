@@ -150,8 +150,8 @@ function App() {
   if (booting) return <main className="boot-screen" role="status"><span className="brand-mark">R<span>↗</span></span><p>Loading RepsCV…</p></main>
   if (!user) return <Auth onAuthenticated={onAuthenticated} />
 
-  const focusWorkout = route.name === 'workout' && activeWorkout !== null
-  return <div className="app-shell">
+  const focusWorkout = route.name === 'workout' && (selectedMode !== null || activeWorkout !== null)
+  return <div className={`app-shell${focusWorkout ? ' app-shell--workout' : ''}`}>
     <header className="app-header">
       <button type="button" className="brand-button" onClick={() => go({ name: 'dashboard' })} aria-label="RepsCV dashboard"><span className="brand-mark">R<span>↗</span></span><span>RepsCV</span></button>
       <span className="header-caption">BUILT BY THE REP</span>

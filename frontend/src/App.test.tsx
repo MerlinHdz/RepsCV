@@ -63,6 +63,8 @@ test('registers, reaches dashboard, and opens the camera from workout mode selec
   fireEvent.click(screen.getByRole('button', { name: /Start workout/ }))
   fireEvent.click(screen.getByRole('button', { name: /Normal/ }))
   expect(screen.getByText('Camera mode: normal')).toBeTruthy()
+  expect(screen.queryByRole('navigation', { name: 'Main navigation' })).toBeNull()
+  expect(document.querySelector('.app-shell--workout')).toBeTruthy()
 })
 
 test('dashboard, history, leaderboard, and profile show persisted data', async () => {
@@ -111,6 +113,7 @@ test('completed result is a dedicated screen with paths back into the app', asyn
   expect(screen.getByRole('button', { name: /View history/ })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: /Back to dashboard/ }))
   await screen.findByText('Your progress')
+  expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeTruthy()
 })
 
 test('interrupted result shows zero XP, and refresh loads a saved result', async () => {

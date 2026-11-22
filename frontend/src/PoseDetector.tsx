@@ -331,25 +331,43 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
 
   return (
     <main className="detector">
-      <header><p className="eyebrow">RepsCV · {modeLabel(mode)}</p><h1>Every rep, in view.</h1><p>Place your camera to the side and keep your full body visible.</p></header>
-      <section className="dashboard" aria-label="Live workout status">
-        <div className="count-card"><span>Valid push-ups</span><strong aria-live="polite">{reps}</strong><small>Server count</small></div>
-        <div className="status-card">
-          <p><span className="label">Session</span><strong>{status}</strong></p>
-          <p><span className="label">Tracking</span><strong>{tracking}</strong></p>
-          <p><span className="label">Movement</span><strong>{phase === 'UNKNOWN' ? 'Get ready' : phase === 'UP' ? 'At top' : 'At bottom'}</strong></p>
-          <p><span className="label">Form</span><strong>{formValid ? 'Valid' : 'Needs attention'}</strong></p>
+      <header className="workout-heading">
+        <div><p className="eyebrow">Push-ups</p><h1>{modeLabel(mode)}</h1></div>
+        <span className="workout-stage">{session ? 'In progress' : 'Camera setup'}</span>
+      </header>
+
+      <div className="camera-frame">
+        <video ref={videoRef} autoPlay playsInline muted aria-label="Live camera" />
+        <canvas ref={canvasRef} aria-hidden="true" />
+        {!ready && <div className="camera-placeholder"><span>Camera preview</span><small>Full body in frame · Side view</small></div>}
+        <span className={`camera-status${connected ? ' is-connected' : ''}`}>
+          <span aria-hidden="true" />{!ready ? 'Camera off' : !session ? 'Camera ready' : connected ? 'Connected' : 'Disconnected'}
+        </span>
+        <details className="workout-details">
+          <summary>Details</summary>
+          <dl>
+            <div><dt>Session</dt><dd>{status}</dd></div>
+            <div><dt>Tracking</dt><dd>{tracking}</dd></div>
+            <div><dt>Movement</dt><dd>{phase === 'UNKNOWN' ? 'Get ready' : phase === 'UP' ? 'At top' : 'At bottom'}</dd></div>
+            <div><dt>Form</dt><dd>{formValid ? 'Valid' : 'Needs attention'}</dd></div>
+          </dl>
+        </details>
+      </div>
+
+      <div className="workout-console">
+        <section className="workout-metrics" aria-label="Live workout status">
+          <div className="workout-reps"><span>Valid reps</span><strong aria-live="polite" aria-atomic="true">{reps}</strong></div>
+          <div className="workout-time"><span>Elapsed</span><strong>{formatDuration(elapsed)}</strong></div>
+          {mode === 'max_set' && <div className="workout-time countdown"><span>{reps === 0 ? 'First rep in' : 'Next rep in'}</span><strong>{remaining === null ? '—' : `${(remaining / 1000).toFixed(1)}s`}</strong></div>}
+        </section>
+        <p className="feedback" role="status" aria-live="polite">{feedback}</p>
+        <div className="workout-actions" role="group" aria-label="Workout controls">
+          {ready && !session && <button type="button" onClick={startWorkout} disabled={!poseSeen || working}>{working ? 'Starting…' : 'Start workout'}</button>}
+          {session && <button type="button" onClick={finishWorkout} disabled={working}>{working ? 'Finishing…' : endLabel(mode)}</button>}
+          {!ready && <button type="button" className={session ? 'secondary' : undefined} onClick={prepareCamera} disabled={preparing || resume?.mode === 'max_set'}>{preparing ? 'Preparing…' : 'Prepare camera'}</button>}
+          {ready && session && !connected && mode === 'normal' && <button type="button" className="secondary" onClick={startWorkout} disabled={!poseSeen || working}>Reconnect tracking</button>}
+          {!session && <button type="button" className="secondary" onClick={onBack}>Back</button>}
         </div>
-      </section>
-      {session && <div className="timers"><p>Elapsed <strong>{formatDuration(elapsed)}</strong></p>{mode === 'max_set' && <p className="countdown">Next rep <strong>{remaining === null ? '…' : (remaining / 1000).toFixed(1)}s</strong></p>}</div>}
-      <div className="camera-frame"><video ref={videoRef} autoPlay playsInline muted aria-label="Live camera" /><canvas ref={canvasRef} aria-hidden="true" />{!ready && <span className="camera-placeholder">Camera preview</span>}</div>
-      <p className="feedback" role="status" aria-live="polite">{feedback}</p>
-      <div className="actions">
-        {!ready && <button type="button" onClick={prepareCamera} disabled={preparing || resume?.mode === 'max_set'}>{preparing ? 'Preparing…' : 'Prepare camera'}</button>}
-        {ready && !session && <button type="button" onClick={startWorkout} disabled={!poseSeen || working}>{working ? 'Starting…' : 'Start workout'}</button>}
-        {ready && session && !connected && mode === 'normal' && <button type="button" onClick={startWorkout} disabled={!poseSeen || working}>Reconnect tracking</button>}
-        {session && <button type="button" onClick={finishWorkout} disabled={working}>{working ? 'Finishing…' : endLabel(mode)}</button>}
-        {!session && <button type="button" className="secondary" onClick={onBack}>Back</button>}
       </div>
     </main>
   )
