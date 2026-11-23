@@ -1,4 +1,5 @@
 export type Mode = 'normal' | 'max_set'
+export type DepartmentOption = { value: string; label: string }
 export type ActiveWorkout = { id: number; mode: Mode; rep_count: number; status: string; started_at: string }
 export type User = { id: number; username: string; department: string | null; csrf_token: string; active_workout?: ActiveWorkout | null }
 export type WorkoutResult = {
@@ -39,6 +40,7 @@ async function request<T>(path: string, method = 'GET', body?: unknown, csrfToke
 }
 
 export const api = {
+  departments: () => request<DepartmentOption[]>('/api/departments'),
   me: () => request<User>('/api/auth/me'),
   register: (username: string, password: string, department: string) =>
     request<User>('/api/auth/register', 'POST', { username, password, department: department || null }),

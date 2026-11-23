@@ -6,6 +6,7 @@ import { api, type WorkoutResult } from './api'
 vi.mock('./api', () => ({ api: {
   me: vi.fn(), register: vi.fn(), login: vi.fn(), logout: vi.fn(),
   history: vi.fn(), profile: vi.fn(), status: vi.fn(), dashboard: vi.fn(), leaderboard: vi.fn(),
+  departments: vi.fn(),
 } }))
 
 vi.mock('./PoseDetector', () => ({ default: ({ mode, resume, onSessionStarted, onResult }: {
@@ -46,6 +47,7 @@ beforeEach(() => {
   vi.mocked(api.leaderboard).mockResolvedValue(leaderboard)
   vi.mocked(api.status).mockResolvedValue(result)
   vi.mocked(api.profile).mockResolvedValue(user)
+  vi.mocked(api.departments).mockResolvedValue([{ value: 'CS', label: 'CS — Computer Science' }])
   vi.mocked(api.logout).mockResolvedValue(undefined)
 })
 

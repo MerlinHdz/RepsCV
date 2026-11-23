@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { api, type User } from '../api'
+import DepartmentSelect from '../components/DepartmentSelect'
+import { useResource } from '../useResource'
 
 type Props = { onAuthenticated: (user: User) => void }
 
@@ -10,6 +12,7 @@ export default function Auth({ onAuthenticated }: Props) {
   const [department, setDepartment] = useState('')
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
+  const departments = useResource(api.departments)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -34,7 +37,7 @@ export default function Auth({ onAuthenticated }: Props) {
       <h2>{registering ? 'Create your account' : 'Welcome back'}</h2>
       <label htmlFor="username">Username</label><input id="username" value={username} onChange={(event) => setUsername(event.target.value)} required minLength={3} maxLength={20} autoComplete="username" placeholder="Your username" />
       <label htmlFor="password">Password</label><input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} autoComplete={registering ? 'new-password' : 'current-password'} placeholder="At least 8 characters" />
-      {registering && <><label htmlFor="department">NTHU department <small>optional</small></label><input id="department" value={department} onChange={(event) => setDepartment(event.target.value)} maxLength={100} placeholder="e.g. Computer Science" /></>}
+      {registering && <><label htmlFor="department">NTHU department <small>optional</small></label><DepartmentSelect value={department} onChange={setDepartment} options={departments.data} loading={departments.loading} error={departments.error} retry={departments.retry} disabled={working} /></>}
       {error && <p className="error-message" role="alert">{error}</p>}
       <button type="submit" disabled={working}>{working ? 'Please wait…' : registering ? 'Create account' : 'Log in'} <span aria-hidden="true">↗</span></button>
       <button className="auth-switch" type="button" onClick={() => { setRegistering(!registering); setError('') }}>

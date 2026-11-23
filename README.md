@@ -30,6 +30,19 @@ and how clearly the camera can see your body.
 - **Weekly leaderboard:** rank by earned XP, with equal XP sharing the same rank.
 - **Profile:** account details and an optional, editable NTHU department.
 
+Registration and Profile use the same optional department dropdown, served by
+`GET /api/departments`. Python validates selections and stores the short code
+(for example, `CS`); clearing a selection stores `NULL`.
+
+Existing databases need no schema change or reset. On startup (or when running
+`python -m backend.init_db`), an idempotent transaction converts known department
+codes, exact full names, and dropdown labels to canonical codes, ignoring case
+and extra whitespace. Blank entries become `NULL`. Unrecognized text is retained
+and displayed in Profile until its owner chooses a listed department or clears
+it; it is never guessed or discarded. Credentials, sessions, workouts, and XP
+are untouched by this conversion. Back up an existing database with
+`uv run python -m backend.backup /path/to/new-backup.db` before upgrading.
+
 Completed workouts earn **10 XP per accepted push-up**. A zero-rep workout can
 be saved and earns zero XP. Interrupted Max Sets earn no XP or personal best.
 Max Sets are interrupted by a dropped workout connection or prolonged tracking

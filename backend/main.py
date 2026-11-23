@@ -23,6 +23,7 @@ from backend.rate_limit import AuthThrottle
 from backend.frontend import install_frontend
 
 from backend.database import Base, LoginSession, User, make_database, utcnow
+from backend.departments import department_options, normalize_existing_departments, validate_department
 from backend.statistics import dashboard as dashboard_summary, weekly_leaderboard, workout_history
 from backend.workouts import WorkoutLimits, WorkoutManager, validate_pose_message
 
@@ -61,6 +62,7 @@ def create_app(database_url=None, clock=None, limits=None):
     async def lifespan(application):
         if not settings.maintenance:
             Base.metadata.create_all(engine)
+            normalize_existing_departments(session_factory)
             manager.recover_startup()
         yield
         for runtime in list(manager.runtimes.values()):
@@ -153,7 +155,7 @@ def create_app(database_url=None, clock=None, limits=None):
             raise HTTPException(422, "Username must be 3–20 letters, digits, or underscores.")
         if len(body.password) < 8 or len(body.password) > 128:
             raise HTTPException(422, "Password must be 8–128 characters.")
-        department = body.department.strip() if body.department else None
+        department = validate_department(body.department)
         with session_factory() as db:
             user = User(username=username, password_hash=PASSWORD_HASHER.hash(body.password),
                         department=department or None)
@@ -204,13 +206,17 @@ def create_app(database_url=None, clock=None, limits=None):
                 "csrf_token": login_session.csrf_token,
                 "active_workout": manager.active_for_user(user.id)}
 
+    @application.get("/api/departments")
+    def departments():
+        return department_options()
+
     @application.patch("/api/profile")
     def profile(body: ProfileUpdate, request: Request):
         user, login_session = auth(request)
         csrf(request, login_session)
         with session_factory() as db:
             row = db.get(User, user.id)
-            row.department = body.department.strip() or None if body.department is not None else None
+            row.department = validate_department(body.department)
             db.commit()
             return {"id": row.id, "username": row.username, "department": row.department}
 
