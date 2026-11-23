@@ -58,7 +58,8 @@ class RepCounterTests(unittest.TestCase):
         counter = RepCounter()
         hold(counter, 170, 0, right=False)
         result = counter.update(frame(90, left=False), now=0.25)
-        self.assertEqual((result["state"], result["tracking"]), ("UNKNOWN", "limited"))
+        self.assertEqual((result["state"], result["tracking"]), ("UP", "limited"))
+        self.assertEqual(counter.update(frame(90, left=False), now=0.4)["state"], "UNKNOWN")
         self.assertEqual(hold(counter, 170, 0.55, left=False)["reps"], 0)
 
     def test_partial_rep_and_one_frame_spike_do_not_count(self):
@@ -113,10 +114,10 @@ class RepCounterTests(unittest.TestCase):
         counter = RepCounter()
         hold(counter, 170, 0)
         hold(counter, 90, 0.25)
-        lost = counter.update({"aspect_ratio": 1, "landmarks": None}, now=0.4)
+        lost = counter.update({"aspect_ratio": 1, "landmarks": None}, now=0.65)
         self.assertEqual((lost["tracking"], lost["state"]), ("lost", "UNKNOWN"))
-        self.assertEqual(hold(counter, 170, 0.55)["reps"], 0)
-        hold(counter, 90, 0.8)
+        self.assertEqual(hold(counter, 170, 0.7)["reps"], 0)
+        hold(counter, 90, 1.0)
         self.assertEqual(counter.update(frame(170), now=2.0)["state"], "UNKNOWN")
         self.assertEqual(hold(counter, 170, 2.1)["reps"], 0)
 
@@ -125,9 +126,9 @@ class RepCounterTests(unittest.TestCase):
         hold(counter, 170, 0)
         hold(counter, 90, 0.25)
         counter.update({"aspect_ratio": 1, "landmarks": None}, now=0.4)
-        hold(counter, 170, 0.6)
-        hold(counter, 90, 0.85)
-        self.assertEqual(hold(counter, 170, 1.15)["reps"], 1)
+        hold(counter, 170, 0.7)
+        hold(counter, 90, 0.95)
+        self.assertEqual(hold(counter, 170, 1.25)["reps"], 1)
 
     def test_invalid_protocol_frame(self):
         self.assertFalse(validate_pose_message(wire({"aspect_ratio": float("nan"), "landmarks": None})))

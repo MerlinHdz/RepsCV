@@ -241,6 +241,8 @@ class WorkoutManager:
                 return {"type": "workout_update", "rep_count": result["reps"],
                         "phase": result["state"], "tracking": result["tracking"],
                         "form_valid": result["form_valid"], "feedback": result["feedback"],
+                        "elbow_angle": result["elbow_angle"], "body_angle": result["body_angle"],
+                        "measured_side": result["measured_side"],
                         "elapsed_ms": round((now - runtime.started_mono) * 1000),
                         "remaining_ms": max(0, round((runtime.deadline_mono - now) * 1000))
                         if runtime.deadline_mono is not None else None}

@@ -18,6 +18,7 @@ type Update = {
   type: string; rep_count?: number; phase?: string; tracking?: string
   form_valid?: boolean; feedback?: string; elapsed_ms?: number
   remaining_ms?: number | null
+  elbow_angle?: number | null; body_angle?: number | null; measured_side?: string | null
 }
 
 function workoutSocketUrl(id: number) {
@@ -55,6 +56,7 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
   const [formValid, setFormValid] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [remaining, setRemaining] = useState<number | null>(null)
+  const [measurement, setMeasurement] = useState<Pick<Update, 'elbow_angle' | 'body_angle' | 'measured_side'> | null>(null)
 
   const releaseResources = useCallback(() => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
@@ -158,6 +160,7 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
           setTracking(data.tracking ?? 'Unknown')
           setFormValid(Boolean(data.form_valid))
           setFeedback(data.feedback ?? '')
+          setMeasurement({ elbow_angle: data.elbow_angle, body_angle: data.body_angle, measured_side: data.measured_side })
           if (data.remaining_ms !== null && data.remaining_ms !== undefined) {
             deadlineViewRef.current = Date.now() + data.remaining_ms
             setRemaining(data.remaining_ms)
@@ -233,6 +236,7 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
       setStatus('Camera ready')
 
       let lastInference = 0
+      let lastVideoTime = -1
       const trackFrame = () => {
         if (!current() || !cameraActive.current) return
         if (performance.now() - lastInference < 80) {
@@ -242,7 +246,9 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
         lastInference = performance.now()
         try {
           const video = videoRef.current
-          if (video && video.readyState >= 2 && video.videoHeight > 0) {
+          if (video && video.readyState >= 2 && video.videoHeight > 0 && video.currentTime !== lastVideoTime) {
+            // A stalled camera frame cannot provide repeated stability evidence.
+            lastVideoTime = video.currentTime
             const now = performance.now()
             const result = model.detectForVideo(video, now)
             setPoseSeen(result.landmarks.length > 0)
@@ -350,6 +356,8 @@ export default function PoseDetector({ mode, csrfToken, resume, onResult, onSess
             <div><dt>Tracking</dt><dd>{tracking}</dd></div>
             <div><dt>Movement</dt><dd>{phase === 'UNKNOWN' ? 'Get ready' : phase === 'UP' ? 'At top' : 'At bottom'}</dd></div>
             <div><dt>Form</dt><dd>{formValid ? 'Valid' : 'Needs attention'}</dd></div>
+            <div><dt>Measured arm</dt><dd>{measurement?.measured_side ?? '—'}</dd></div>
+            <div><dt>Elbow / body</dt><dd>{measurement?.elbow_angle == null ? '—' : `${measurement.elbow_angle}°`} / {measurement?.body_angle == null ? '—' : `${measurement.body_angle}°`}</dd></div>
           </dl>
         </details>
       </div>

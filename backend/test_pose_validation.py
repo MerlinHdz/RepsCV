@@ -45,8 +45,10 @@ class PoseValidationTests(unittest.TestCase):
         result = counter.update(pose, now=0.25)
         self.assertFalse(result["form_valid"])
         self.assertEqual(result["tracking"], "limited")
-        self.assertEqual(result["state"], "UNKNOWN")
+        self.assertEqual(result["state"], "UP")  # Brief occlusion freezes the proven phase.
+        self.assertEqual(result["reps"], 0)
         self.assertIn("full arm", result["feedback"])
+        self.assertEqual(counter.update(pose, now=0.4)["state"], "UNKNOWN")
 
     def test_nonfinite_and_out_of_range_landmarks_are_unusable(self):
         for bad_x in (float("nan"), float("inf"), 4, "0.2", True):

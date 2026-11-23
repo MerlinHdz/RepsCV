@@ -51,6 +51,29 @@ landmarks and confidence values to Python, which validates posture and counts a
 stable top–bottom–top movement as one repetition. Python also controls workout
 deadlines, finalization, XP, and personal-best eligibility.
 
+The counter follows one consistently visible arm; a sufficiently confident second
+arm also checks symmetry. Endpoint confirmation requires at least two observations
+spanning 80 ms. Small angle jitter can preserve pending evidence, but does not
+replace the required depth or extension observations. A brief missing-landmark
+gap (up to 250 ms since the last usable pose) preserves an already confirmed phase;
+it cannot establish a new phase or earn a rep. Observed invalid posture or longer
+tracking loss requires starting again from the top. Frozen camera frames are not
+resent as new observations.
+
+Detector parameters live in `backend/rep_counter.py`; Max Set deadlines remain
+in `backend/workouts.py`. Only accepted reps renew the five-second deadline.
+The workout **Details** panel shows the server's measured arm, elbow/body angles,
+and movement phase to help distinguish missed depth, extension, and tracking loss.
+These are camera estimates, not professional form assessments.
+
+When checking tracker changes on a phone, first use Normal Workout and manually
+compare ten controlled reps and ten quicker reps with the displayed count. Also
+try shallow reps, a top hold, and briefly moving out of view: none should create
+extra reps. Then try Max Set, confirming that each accepted rep renews the timer
+and five seconds without another accepted rep ends the set. Repeat with the same
+framing on iPhone/Safari and Android/Chrome; automated landmark sequences alone
+do not establish camera accuracy.
+
 **Camera video stays on your device.** Audio is disabled, and the app does not
 record or upload video. Body coordinates are transmitted to the backend for
 live validation and counting.

@@ -24,8 +24,9 @@ function cameraHarness(mode: Mode = 'normal') {
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ clearRect: vi.fn() } as never)
   vi.mocked(FilesetResolver.forVisionTasks).mockResolvedValue({} as never)
+  const detectForVideo = vi.fn(() => ({ landmarks: [Array.from({ length: 33 }, () => ({ x: 0, y: 0, visibility: 1 }))] }))
   vi.mocked(PoseLandmarker.createFromOptions).mockResolvedValue({
-    detectForVideo: () => ({ landmarks: [Array.from({ length: 33 }, () => ({ x: 0, y: 0, visibility: 1 }))] }),
+    detectForVideo,
     close,
   } as never)
   let nextFrame: FrameRequestCallback | undefined
@@ -56,7 +57,13 @@ function cameraHarness(mode: Mode = 'normal') {
     Object.defineProperties(video, { readyState: { value: 2 }, videoWidth: { value: 640 }, videoHeight: { value: 480 } })
     act(() => nextFrame?.(100))
   }
-  return { stop, close, getUserMedia, sockets, prepare }
+  function advanceFrame(now: number, videoTime: number) {
+    vi.mocked(performance.now).mockReturnValue(now)
+    const video = screen.getByLabelText('Live camera') as HTMLVideoElement
+    video.currentTime = videoTime
+    act(() => nextFrame?.(now))
+  }
+  return { stop, close, getUserMedia, sockets, prepare, detectForVideo, advanceFrame }
 }
 
 test('counter, feedback, and Finish stay in one console; Finish submits once and media is released', async () => {
@@ -78,8 +85,11 @@ test('counter, feedback, and Finish stay in one console; Finish submits once and
   act(() => {
     camera.sockets[0].open()
     camera.sockets[0].update({ type: 'workout_update', rep_count: 4, phase: 'UP', tracking: 'tracked',
-      form_valid: true, feedback: 'Good position. Lower your chest, then press up.' })
+      form_valid: true, feedback: 'Good position. Lower your chest, then press up.',
+      elbow_angle: 165, body_angle: 178, measured_side: 'left' })
   })
+  expect(screen.getByText('left')).toBeTruthy()
+  expect(screen.getByText('165° / 178°')).toBeTruthy()
   const consoleView = within(document.querySelector('.workout-console') as HTMLElement)
   expect(consoleView.getByText('4')).toBeTruthy()
   expect(consoleView.getByRole('status').textContent).toContain('Lower your chest')
@@ -147,4 +157,28 @@ test('camera denial keeps retry and Back available and never starts a workout', 
   expect(camera.sockets).toHaveLength(0)
   fireEvent.click(screen.getByRole('button', { name: 'Back' }))
   expect(back).toHaveBeenCalledOnce()
+})
+
+test('frozen video cannot send repeated pose evidence; fresh frames resume without queued sends', async () => {
+  const camera = cameraHarness()
+  render(<PoseDetector mode="normal" csrfToken="csrf" onResult={vi.fn()} onBack={vi.fn()} />)
+  await camera.prepare()
+  fireEvent.click(screen.getByRole('button', { name: 'Start workout' }))
+  await screen.findByRole('button', { name: 'Finish workout' })
+  act(() => camera.sockets[0].open())
+  camera.advanceFrame(1100, 0.1)
+  expect(camera.sockets[0].send).toHaveBeenCalledTimes(1)
+  camera.advanceFrame(1200, 0.1)
+  camera.advanceFrame(1300, 0.1)
+  expect(camera.sockets[0].send).toHaveBeenCalledTimes(1)
+  expect(camera.detectForVideo).toHaveBeenCalledTimes(2) // Preview, then first new frame.
+  camera.sockets[0].bufferedAmount = 100
+  camera.advanceFrame(1400, 0.2)
+  expect(camera.sockets[0].send).toHaveBeenCalledTimes(1)
+  camera.sockets[0].bufferedAmount = 0
+  camera.advanceFrame(1500, 0.3)
+  expect(camera.sockets[0].send).toHaveBeenCalledTimes(2)
+  const message = JSON.parse(camera.sockets[0].send.mock.calls[1][0])
+  expect(message.sequence).toBe(1)
+  expect(message.timestamp_ms).toBe(1500)
 })
