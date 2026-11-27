@@ -27,6 +27,43 @@ export type WeeklyLeaderboard = {
   current_user_rank: number | null; entries: LeaderboardEntry[]
 }
 
+
+export type NutritionEntry = {
+  id: number
+  logged_at: string
+  meal_type: string
+  description: string
+  calories: number | null
+  protein: number | null
+  carbs: number | null
+  fat: number | null
+  water_ml: number | null
+}
+
+export type NutritionInput = {
+  meal_type: string
+  description: string
+  calories?: number | null
+  protein?: number | null
+  carbs?: number | null
+  fat?: number | null
+  water_ml?: number | null
+}
+
+export type NutritionSummary = {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  water_ml: number
+}
+export type NutritionGoals = {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  water_ml: number
+}
 async function request<T>(path: string, method = 'GET', body?: unknown, csrfToken?: string): Promise<T> {
   const response = await fetch(path, {
     method, credentials: 'same-origin',
@@ -53,4 +90,15 @@ export const api = {
   history: () => request<WorkoutResult[]>('/api/workouts'),
   dashboard: () => request<DashboardSummary>('/api/dashboard'),
   leaderboard: () => request<WeeklyLeaderboard>('/api/leaderboard?period=weekly'),
+  nutrition: () => request<NutritionEntry[]>('/api/nutrition'),
+  createNutrition: (entry: NutritionInput, csrf: string) =>
+  
+    request<NutritionEntry>('/api/nutrition', 'POST', entry, csrf),
+  nutritionSummary: () => request<NutritionSummary>('/api/nutrition/summary'),
+  nutritionGoals: () => request<NutritionGoals>('/api/nutrition/goals'),
+  updateNutritionGoals: (goals: Partial<NutritionGoals>, csrf: string) =>
+    request<NutritionGoals>('/api/nutrition/goals', 'PUT', goals, csrf),
 }
+
+
+

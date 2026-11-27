@@ -1,7 +1,8 @@
 """RepsCV authenticated API and workout-specific landmark WebSocket."""
 
 from contextlib import asynccontextmanager
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import hashlib
 import hmac
 import json
@@ -26,7 +27,15 @@ from backend.database import Base, LoginSession, User, make_database, utcnow
 from backend.departments import department_options, normalize_existing_departments, validate_department
 from backend.statistics import dashboard as dashboard_summary, weekly_leaderboard, workout_history
 from backend.workouts import WorkoutLimits, WorkoutManager, validate_pose_message
+from backend.nutrition import (
+    create_entry,
+    get_entries,
+    daily_summary,
+    update_entry,
+    delete_entry,
+)
 
+from backend.nutrition_goals import get_goals, update_goals
 
 COOKIE_NAME = "repscv_session"
 PASSWORD_HASHER = PasswordHasher()
@@ -47,6 +56,34 @@ class WorkoutStart(BaseModel):
     exercise: str
     mode: str
 
+class NutritionCreate(BaseModel):
+    meal_type: str = Field(min_length=1, max_length=20)
+    description: str = Field(min_length=1, max_length=200)
+
+    calories: float | None = Field(default=None, ge=0)
+    protein: float | None = Field(default=None, ge=0)
+    carbs: float | None = Field(default=None, ge=0)
+    fat: float | None = Field(default=None, ge=0)
+    water_ml: int | None = Field(default=None, ge=0)
+
+
+class NutritionUpdate(BaseModel):
+    meal_type: str | None = Field(default=None, min_length=1, max_length=20)
+    description: str | None = Field(default=None, min_length=1, max_length=200)
+
+    calories: float | None = Field(default=None, ge=0)
+    protein: float | None = Field(default=None, ge=0)
+    carbs: float | None = Field(default=None, ge=0)
+    fat: float | None = Field(default=None, ge=0)
+    water_ml: int | None = Field(default=None, ge=0)
+
+
+class NutritionGoalsUpdate(BaseModel):
+    calories: float | None = Field(default=None, ge=0)
+    protein: float | None = Field(default=None, ge=0)
+    carbs: float | None = Field(default=None, ge=0)
+    fat: float | None = Field(default=None, ge=0)
+    water_ml: int | None = Field(default=None, ge=0)
 
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
@@ -250,6 +287,129 @@ def create_app(database_url=None, clock=None, limits=None):
         if period != "weekly":
             raise HTTPException(422, "Only the weekly leaderboard is available.")
         return weekly_leaderboard(session_factory, user.id, manager.clock.utcnow())
+
+
+    @application.get("/api/nutrition")
+    def nutrition_entries(request: Request):
+        user, _ = auth(request)
+
+        with session_factory() as db:
+            entries = get_entries(
+                db=db,
+                user_id=user.id,
+                start=datetime.min.replace(tzinfo=timezone.utc),
+                end=datetime.max.replace(tzinfo=timezone.utc),
+            )
+
+            return [
+                {
+                    "id": entry.id,
+                    "logged_at": entry.logged_at.isoformat(),
+                    "meal_type": entry.meal_type,
+                    "description": entry.description,
+                    "calories": entry.calories,
+                    "protein": entry.protein,
+                    "carbs": entry.carbs,
+                    "fat": entry.fat,
+                    "water_ml": entry.water_ml,
+                }
+                for entry in entries
+            ]
+    
+    @application.get("/api/nutrition/goals")
+    def nutrition_goals(request: Request):
+        user, _ = auth(request)
+
+        with session_factory() as db:
+            goals = get_goals(db, user.id)
+
+            return {
+                "calories": goals.calories,
+                "protein": goals.protein,
+                "carbs": goals.carbs,
+                "fat": goals.fat,
+                "water_ml": goals.water_ml,
+            }
+    
+    @application.put("/api/nutrition/goals")
+    def nutrition_goals_update(body: NutritionGoalsUpdate, request: Request):
+        user, login_session = auth(request)
+        csrf(request, login_session)
+
+        with session_factory() as db:
+            goals = update_goals(
+                db=db,
+                user_id=user.id,
+                calories=body.calories,
+                protein=body.protein,
+                carbs=body.carbs,
+                fat=body.fat,
+                water_ml=body.water_ml,
+            )
+
+            return {
+                "calories": goals.calories,
+                "protein": goals.protein,
+                "carbs": goals.carbs,
+                "fat": goals.fat,
+                "water_ml": goals.water_ml,
+            }
+
+    @application.get("/api/nutrition/summary")
+    def nutrition_daily_summary(request: Request):
+        user, _ = auth(request)
+
+        taipei = ZoneInfo("Asia/Taipei")
+        today = datetime.now(taipei).date()
+
+        start = datetime.combine(
+            today,
+            datetime.min.time(),
+            tzinfo=taipei,
+        ).astimezone(timezone.utc)
+
+        end = datetime.combine(
+            today + timedelta(days=1),
+            datetime.min.time(),
+            tzinfo=taipei,
+        ).astimezone(timezone.utc)
+
+        with session_factory() as db:
+            return daily_summary(
+                db=db,
+                user_id=user.id,
+                start=start,
+                end=end,
+            )
+    @application.post("/api/nutrition", status_code=201)
+    def nutrition_create(body: NutritionCreate, request: Request):
+        user, login_session = auth(request)
+        csrf(request, login_session)
+
+        with session_factory() as db:
+            entry = create_entry(
+                db=db,
+                user_id=user.id,
+                meal_type=body.meal_type,
+                description=body.description,
+                calories=body.calories,
+                protein=body.protein,
+                carbs=body.carbs,
+                fat=body.fat,
+                water_ml=body.water_ml,
+            )
+
+            return {
+                "id": entry.id,
+                "logged_at": entry.logged_at.isoformat(),
+                "meal_type": entry.meal_type,
+                "description": entry.description,
+                "calories": entry.calories,
+                "protein": entry.protein,
+                "carbs": entry.carbs,
+                "fat": entry.fat,
+                "water_ml": entry.water_ml,
+            }
 
     @application.get("/api/workouts/{session_id}")
     async def workout_status(session_id: int, request: Request):

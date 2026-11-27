@@ -6,6 +6,7 @@ import Auth from './screens/Auth'
 import Dashboard from './screens/Dashboard'
 import History from './screens/History'
 import Leaderboard from './screens/Leaderboard'
+import Nutrition from './screens/Nutrition'
 import Profile from './screens/Profile'
 import ResultRoute from './screens/ResultRoute'
 import WorkoutSelect from './screens/WorkoutSelect'
@@ -15,6 +16,7 @@ const NAV: { name: RouteName; label: string }[] = [
   { name: 'dashboard', label: 'Home' },
   { name: 'workout', label: 'Workout' },
   { name: 'history', label: 'History' },
+  { name: 'nutrition', label: 'Nutrition' },
   { name: 'leaderboard', label: 'Leaders' },
   { name: 'profile', label: 'Profile' },
 ]
@@ -24,6 +26,7 @@ function NavIcon({ name }: { name: RouteName }) {
     dashboard: 'M3 10.5 12 3l9 7.5M5.5 9.5V21h13V9.5M9 21v-7h6v7',
     workout: 'M2 9v6m3-9v12m3-10v8m8-8v8m3-10v12m3-9v6M8 12h8',
     history: 'M4 4v5h5M4.5 9A8.5 8.5 0 1 1 3.5 14M12 7v5l3 2',
+    nutrition: 'M4 2v7m4-7v7M6 9v13M16 2c-2 3-3 6-3 9h4v10m0-10V2',
     leaderboard: 'M4 20v-7h5v7M10 20V4h5v16M16 20v-10h5v10M2 20h20',
     profile: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21c0-4.4 3.6-7 8-7s8 2.6 8 7',
   }
@@ -162,6 +165,7 @@ function App() {
       {route.name === 'dashboard' && <Dashboard user={user} activeWorkout={activeWorkout} onStart={startWorkout}
         onResume={() => go({ name: 'workout' })} onHistory={() => go({ name: 'history' })} onOpenWorkout={openWorkout} />}
       {route.name === 'history' && <History onStart={startWorkout} onOpenWorkout={openWorkout} />}
+      {route.name === 'nutrition' && <Nutrition csrfToken={user.csrf_token} />}
       {route.name === 'leaderboard' && <Leaderboard />}
       {route.name === 'profile' && <Profile user={user} onUpdate={setUser} onLogout={logout} />}
       {route.name === 'workout' && (selectedMode || activeWorkout

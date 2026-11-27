@@ -29,7 +29,7 @@
 .empty-card p { margin: 4px 0 16px; }
 
 /* Navigation */
-.bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); padding: 8px 7px calc(8px + env(safe-area-inset-bottom)); background: #11191bee; backdrop-filter: blur(18px); border-top: 1px solid var(--line); }
+.bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(6, 1fr); padding: 8px 7px calc(8px + env(safe-area-inset-bottom)); background: #11191bee; backdrop-filter: blur(18px); border-top: 1px solid var(--line); }
 .bottom-nav button { min-height: 52px; border: 0; border-radius: 12px; background: none; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .66rem; font-weight: 700; }
 .bottom-nav button[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
 .bottom-nav svg { width: 22px; height: 22px; }

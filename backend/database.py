@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 import os
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, create_engine, event
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -72,6 +72,92 @@ class XPTransaction(Base):
     amount: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+
+class Goal(Base):
+    __tablename__ = "goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True
+    )
+
+    category: Mapped[str] = mapped_column(String(20))
+    metric: Mapped[str] = mapped_column(String(30))
+
+    target_value: Mapped[float] = mapped_column(Float)
+
+    period: Mapped[str] = mapped_column(String(20))
+
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow
+    )
+
+
+class NutritionEntry(Base):
+    __tablename__ = "nutrition_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True
+    )
+
+    logged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        index=True
+    )
+
+    meal_type: Mapped[str] = mapped_column(String(20))
+
+    description: Mapped[str] = mapped_column(String(200))
+
+    calories: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True
+    )
+
+    protein: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True
+    )
+
+    carbs: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True
+    )
+
+    fat: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True
+    )
+
+    water_ml: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True
+    )
+class NutritionGoal(Base):
+    __tablename__ = "nutrition_goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        unique=True,
+        index=True
+    )
+
+    calories: Mapped[float] = mapped_column(Float, default=2200)
+    protein: Mapped[float] = mapped_column(Float, default=120)
+    carbs: Mapped[float] = mapped_column(Float, default=250)
+    fat: Mapped[float] = mapped_column(Float, default=70)
+    water_ml: Mapped[int] = mapped_column(Integer, default=2000)
 
 def database_url():
     return os.environ.get("REPSCV_DATABASE_URL", "sqlite:///./repscv.db")
